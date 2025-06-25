@@ -1,0 +1,67 @@
+local Translations = {
+    info = {
+        bag_full = "This bag can only hold %{maxOutfits} outfits",
+        changing_outfit = "Changing outfit...",
+        animation_failed = "Failed to load animation",
+    },
+    success = {
+        outfit_saved = "Outfit saved to bag: %{outfitName}",
+        outfit_loaded = "Outfit loaded: %{outfitName}",
+        outfit_deleted = "Outfit deleted: %{outfitName}",
+        outfit_edited = "Outfit updated: %{outfitName}",
+    },
+    error = {
+        no_outfit_bag = "You don't have an outfit bag",
+        outfit_not_found = "Outfit not found",
+        cannot_use_here = "You can't use the outfit bag here",
+        failed_to_save = "Failed to save outfit",
+        failed_to_load = "Failed to load outfit",
+        failed_to_delete = "Failed to delete outfit",
+        failed_to_edit = "Failed to update outfit",
+        invalid_name = "Invalid outfit name. Must be between 1-50 characters",
+        blocked_zone = "You can't change outfits in this area",
+        no_permission = "You don't have permission to use this",
+        prop_load_failed = "Failed to load bag model",
+        prop_spawn_failed = "Failed to place bag on ground",
+    },
+    menu = {
+        outfit_bag = "Outfit Bag",
+        save_current = "Save Current Outfit",
+        manage_outfits = "Manage Outfits",
+        outfit_name = "Outfit Name",
+        save = "Save Outfit",
+        load = "Load Outfit",
+        delete = "Delete Outfit",
+        access = "Access Outfit Bag",
+        pickup = "Pick Up Bag",
+        save_description = "Store your current outfit in the bag",
+        storage = "Storage",
+        action = "Action",
+        save_action = "Save current outfit",
+        note = "Note",
+        save_note = "Enter a unique name for your outfit",
+        save_title = "Save Outfit",
+        outfit_name_desc = "Give your outfit a memorable name",
+        outfit_name_placeholder = "My Awesome Outfit",
+        outfit_desc = "Description (Optional)",
+        outfit_desc_desc = "Add notes about this outfit",
+        outfit_desc_placeholder = "My favorite casual wear",
+        no_description = "No description",
+        saved_on = "Saved On",
+        unknown_date = "Unknown",
+        actions_available = "Available Actions",
+        actions_hint = "Click to Load, Edit or Delete",
+        load_description = "Change into this outfit",
+        delete_description = "Remove this outfit from the bag",
+        edit = "Edit Outfit",
+        edit_title = "Edit Outfit Details",
+        edit_description = "Change the name or description of this outfit",
+        no_outfits = "No Saved Outfits",
+        no_outfits_desc = "Save your first outfit using the option above"
+    }
+}
+
+Lang = Lang or Locale:new({
+    phrases = Translations,
+    warnOnMissing = true
+}) 

@@ -1,0 +1,64 @@
+local Translations = {
+    info = {
+        bag_full = "Diese Tasche kann nur %{maxOutfits} Outfits aufnehmen",
+        changing_outfit = "Outfit wird gewechselt...",
+    },
+    success = {
+        outfit_saved = "Outfit in Tasche gespeichert: %{outfitName}",
+        outfit_loaded = "Outfit geladen: %{outfitName}",
+        outfit_deleted = "Outfit gelöscht: %{outfitName}",
+        outfit_edited = "Outfit aktualisiert: %{outfitName}",
+    },
+    error = {
+        no_outfit_bag = "Du hast keine Outfit-Tasche",
+        outfit_not_found = "Outfit nicht gefunden",
+        cannot_use_here = "Du kannst die Outfit-Tasche hier nicht benutzen",
+        failed_to_save = "Outfit konnte nicht gespeichert werden",
+        failed_to_load = "Outfit konnte nicht geladen werden",
+        failed_to_delete = "Outfit konnte nicht gelöscht werden",
+        failed_to_edit = "Outfit konnte nicht aktualisiert werden",
+        invalid_name = "Ungültiger Outfit-Name. Muss zwischen 1-50 Zeichen lang sein",
+        blocked_zone = "Du kannst in diesem Bereich keine Outfits wechseln",
+        no_permission = "Du hast keine Berechtigung, dies zu benutzen",
+    },
+    menu = {
+        outfit_bag = "Outfit-Tasche",
+        save_current = "Aktuelles Outfit Speichern",
+        manage_outfits = "Outfits Verwalten",
+        outfit_name = "Outfit-Name",
+        save = "Outfit Speichern",
+        load = "Outfit Laden",
+        delete = "Outfit Löschen",
+        access = "Tasche Öffnen",
+        pickup = "Tasche Aufheben",
+        save_description = "Speichere dein aktuelles Outfit in der Tasche",
+        storage = "Speicher",
+        action = "Aktion",
+        save_action = "Aktuelles Outfit speichern",
+        note = "Notiz",
+        save_note = "Gib einen eindeutigen Namen für dein Outfit ein",
+        save_title = "Outfit Speichern",
+        outfit_name_desc = "Gib deinem Outfit einen einprägsamen Namen",
+        outfit_name_placeholder = "Mein Tolles Outfit",
+        outfit_desc = "Beschreibung (Optional)",
+        outfit_desc_desc = "Füge Notizen zu diesem Outfit hinzu",
+        outfit_desc_placeholder = "Meine liebste Freizeitkleidung",
+        no_description = "Keine Beschreibung",
+        saved_on = "Gespeichert am",
+        unknown_date = "Unbekanntes Datum",
+        actions_available = "Verfügbare Aktionen",
+        actions_hint = "Klicken zum Laden oder Löschen",
+        load_description = "Dieses Outfit anziehen",
+        delete_description = "Dieses Outfit aus der Tasche entfernen",
+        edit = "Outfit Bearbeiten",
+        edit_title = "Outfit-Details Bearbeiten",
+        edit_description = "Name oder Beschreibung des Outfits ändern",
+        no_outfits = "Keine Gespeicherten Outfits",
+        no_outfits_desc = "Speichere dein erstes Outfit mit der Option oben"
+    }
+}
+
+Lang = Lang or Locale:new({
+    phrases = Translations,
+    warnOnMissing = true
+}) 
