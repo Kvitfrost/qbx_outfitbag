@@ -47,10 +47,15 @@ A feature-rich outfit management system for QBX Framework that adds a portable o
    ```lua
     ['outfit_bag'] = {
         label = 'Outfit Bag',
-        weight = 100,
+        weight = 1000,
         stack = false,
         close = true,
-        description = 'A bag to store and change your outfits on the go'
+        description = 'A bag to store and change your outfits on the go',
+        client = {
+            anim = { dict = 'clothingshirt', clip = 'try_shirt_positive_d' },
+            usetime = 2000,
+            export = 'qbx_outfitbag.useOutfitBag'
+        }
     },
    ```
 5. The SQL table will be auto-created on first resource start
