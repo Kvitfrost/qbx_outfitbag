@@ -1,91 +1,110 @@
 -- Constants
----@class AnimationDicts
-local ANIMATION_DICTS = {
-    PICKUP = Config.Animations.Pickup.dict,
-    PLACE = Config.Animations.Place.dict,
-    CHANGE = Config.Animations.Change.dict
+local ANIMATIONS = {
+    PICKUP = {
+        dict = Config.Animations.Pickup.dict,
+        anim = Config.Animations.Pickup.anim,
+        duration = Config.Animations.Pickup.duration,
+        progressDuration = Config.Animations.Pickup.progressDuration,
+        flags = Config.Animations.Pickup.flags
+    },
+    PLACE = {
+        dict = Config.Animations.Place.dict,
+        anim = Config.Animations.Place.anim,
+        duration = Config.Animations.Place.duration,
+        progressDuration = Config.Animations.Place.progressDuration,
+        flags = Config.Animations.Place.flags
+    },
+    CHANGE = {
+        dict = Config.Animations.Change.dict,
+        anim = Config.Animations.Change.anim,
+        duration = Config.Animations.Change.duration,
+        progressDuration = Config.Animations.Change.progressDuration,
+        flags = Config.Animations.Change.flags
+    }
 }
 
--- Cache frequently used values
 local BAG_PROP_HASH = joaat(Config.Prop.Model)
 local PROP_COORDS_OFFSET = vector3(0, 0, Config.Prop.Placement.ZOffset)
 local FORWARD_OFFSET = Config.Prop.Placement.ForwardOffset
+local GetEntityCoords = GetEntityCoords
+local GetEntityForwardVector = GetEntityForwardVector
+local GetGameTimer = GetGameTimer
+local DoesEntityExist = DoesEntityExist
+local CreateObject = CreateObject
+local DeleteObject = DeleteObject
+local TaskPlayAnim = TaskPlayAnim
+local Wait = Wait
+local TriggerServerEvent = TriggerServerEvent
+local GetEntityModel = GetEntityModel
+local SetEntityCollision = SetEntityCollision
+local FreezeEntityPosition = FreezeEntityPosition
+local PlaceObjectOnGroundProperly = PlaceObjectOnGroundProperly
 
--- Initialize locale
-if not Locale then
-    Locale = {}
-end
-Locale.language = Config.DefaultLanguage
-
----@class AnimationNames
-local ANIMATION_NAMES = {
-    PICKUP = Config.Animations.Pickup.anim,
-    PLACE = Config.Animations.Place.anim,
-    CHANGE = Config.Animations.Change.anim
-}
-
--- State
----@class State
----@field isMenuOpen boolean
----@field bagProp number|nil
----@field bagCoords vector3|nil
-local state = {
+local state = setmetatable({
     isMenuOpen = false,
     bagProp = nil,
     bagCoords = nil,
-    lastInteraction = 0
-}
+    lastInteraction = 0,
+    ownedBags = {}
+}, {
+    __index = function(t, k)
+        if k == 'ownedBags' then
+            t[k] = {}
+            return t[k]
+        end
+    end
+})
 
----@class QBX
----@field PlayerData table
-local QBX = {}
-QBX.PlayerData = {}
-
--- Forward Declarations
-local SpawnBagProp
-
--- Utility Functions
 ---@return string timestamp Format: YYYY-MM-DD HH:MM
 local function FormatTimestamp()
     local year, month, day, hour, minute = GetLocalTime()
-    return string.format('%04d-%02d-%02d %02d:%02d', year, month, day, hour, minute)
+    return ('%04d-%02d-%02d %02d:%02d'):format(year, month, day, hour, minute)
 end
 
 ---@return nil
-local function DeleteBagProp()
-    if state.bagProp then
-        exports.ox_target:removeLocalEntity(state.bagProp)
+DeleteBagProp = function()
+    if state.bagProp and DoesEntityExist(state.bagProp) then
+        state.ownedBags[state.bagProp] = nil
         DeleteObject(state.bagProp)
         state.bagProp = nil
         state.bagCoords = nil
     end
 end
 
--- Animation Functions
----@return nil
-local function PlayChangeAnimation()
-    local ped = cache.ped
-    local anim = Config.Animations.Change
-    if not lib.requestAnimDict(anim.dict, 1000) then
-        lib.notify({
-            title = Lang:t('menu.outfit_bag'),
-            description = Lang:t('info.animation_failed'),
-            type = 'error'
-        })
-        return
+---@return table|nil nearbyPlayers List of nearby players with their server IDs and distances
+local function GetNearbyPlayers()
+    local playerPed = cache.ped
+    local playerCoords = GetEntityCoords(playerPed)
+    local maxDistance = Config.Prop.Interaction.ShareDistance
+    local nearbyPlayers = {}
+    local players = GetActivePlayers()
+    local playersCount = #players
+    
+    for i = 1, playersCount do
+        local player = players[i]
+        local targetPed = GetPlayerPed(player)
+        if targetPed ~= playerPed then
+            local targetCoords = GetEntityCoords(targetPed)
+            local distance = #(playerCoords - targetCoords)
+            if distance <= maxDistance then
+                nearbyPlayers[#nearbyPlayers + 1] = {
+                    id = GetPlayerServerId(player),
+                    distance = math.floor(distance)
+                }
+            end
+        end
     end
     
-    TaskPlayAnim(ped, anim.dict, anim.anim, 8.0, -8.0, -1, anim.flags, 0, false, false, false)
-    Wait(anim.duration)
-    ClearPedTasks(ped)
+    return #nearbyPlayers > 0 and nearbyPlayers or nil
 end
 
 ---@return nil
-local function PlayPickupAnimation()
+PlayAnimation = function(animType)
     local ped = cache.ped
-    local anim = Config.Animations.Pickup
+    local anim = ANIMATIONS[animType]
+    if not anim then return false end
     
-    if state.bagCoords then
+    if animType == 'PLACE' and state.bagCoords then
         TaskTurnPedToFaceCoord(ped, state.bagCoords.x, state.bagCoords.y, state.bagCoords.z, 1500)
         Wait(1200)
     end
@@ -96,49 +115,117 @@ local function PlayPickupAnimation()
             description = Lang:t('info.animation_failed'),
             type = 'error'
         })
-        return
+        return false
     end
     
-    TaskPlayAnim(ped, anim.dict, anim.anim, 1.0, 1.0, anim.duration, anim.flags, 0, false, false, false)
-    Wait(anim.duration)
+    local progressConfig = {
+        duration = anim.progressDuration,
+        position = 'bottom',
+        useWhileDead = false,
+        canCancel = false,
+        disable = {
+            car = true,
+            move = true,
+            combat = true,
+            mouse = false
+        }
+    }
+
+    if animType == 'CHANGE' then
+        progressConfig.label = Lang:t('info.changing_outfit')
+    elseif animType == 'PLACE' then
+        progressConfig.label = Lang:t('info.placing_bag')
+    elseif animType == 'PICKUP' then
+        progressConfig.label = Lang:t('info.picking_up_bag')
+    end
+
+    TaskPlayAnim(ped, anim.dict, anim.anim, 8.0, -8.0, anim.duration, anim.flags, 0, false, false, false)
+    local success = lib.progressBar(progressConfig)
     
-    TriggerServerEvent('qbx_outfitbag:server:addItem')
-    DeleteBagProp()
+    if not success then
+        ClearPedTasks(ped)
+        RemoveAnimDict(anim.dict)
+        return false
+    end
     
-    Wait(300)
     ClearPedTasks(ped)
+    RemoveAnimDict(anim.dict)
+    return true
 end
 
+CreateThread(function()
+    state.ownedBags = state.ownedBags or {}
+    Wait(1000)
+    
+    exports.ox_target:addModel(BAG_PROP_HASH, {
+        {
+            name = 'outfit_bag_menu_shared',
+            icon = Config.Menu.Icons.Access,
+            label = Lang:t('menu.access'),
+            distance = Config.Prop.Interaction.AccessDistance,
+            onSelect = function()
+                if state.isMenuOpen then
+                    lib.hideContext(false)
+                    state.isMenuOpen = false
+                    Wait(100)
+                end
+                OpenOutfitBagMenu()
+            end,
+            canInteract = function(data)
+                local entity = type(data) == 'table' and data.entity or data
+                if not entity then return false end
+                if not DoesEntityExist(entity) then return false end
+                if lib.progressActive() then return false end
+                return state.ownedBags[entity]
+            end
+        },
+        {
+            name = 'outfit_bag_pickup_owner',
+            icon = Config.Menu.Icons.Pickup,
+            label = Lang:t('menu.pickup'),
+            distance = Config.Prop.Interaction.PickupDistance,
+            onSelect = function(data)
+                local entity = type(data) == 'table' and data.entity or data
+                if entity and DoesEntityExist(entity) then
+                    HandleBagPickup(entity)
+                end
+            end,
+            canInteract = function(data)
+                local entity = type(data) == 'table' and data.entity or data
+                if not entity then return false end
+                if not DoesEntityExist(entity) then return false end
+                if GetEntityModel(entity) ~= BAG_PROP_HASH then return false end
+                return not lib.progressActive() and state.ownedBags[entity]
+            end
+        }
+    })
+    
+    local interval = Config.Performance.PropCleanupInterval
+    while true do
+        Wait(interval)
+        local currentTime = GetGameTimer()
+        if state.bagProp and DoesEntityExist(state.bagProp) and (currentTime - state.lastInteraction) > interval then
+            DeleteBagProp()
+            TriggerServerEvent('qbx_outfitbag:server:addItem')
+        end
+    end
+end)
+
 ---@return nil
-local function PlaceBagOnGround()
-    local ped = cache.ped
-    local anim = Config.Animations.Place
-    
-    TriggerServerEvent('qbx_outfitbag:server:removeItem')
-    
-    if not lib.requestAnimDict(anim.dict, 1000) then
+SpawnBagProp = function()
+    local hasItem = lib.callback.await('qbx_outfitbag:server:hasItem', false)
+    if not hasItem then
         lib.notify({
             title = Lang:t('menu.outfit_bag'),
-            description = Lang:t('info.animation_failed'),
+            description = Lang:t('error.no_bag'),
             type = 'error'
         })
         return
     end
-    
-    TaskPlayAnim(ped, anim.dict, anim.anim, 8.0, -8.0, anim.duration, anim.flags, 0, false, false, false)
-    Wait(anim.duration * 0.75)
-    
-    SpawnBagProp()
-    
-    Wait(300)
-    ClearPedTasks(ped)
-    RemoveAnimDict(anim.dict)
-end
 
--- Prop Functions
----@return nil
-SpawnBagProp = function()
-    if state.bagProp then DeleteObject(state.bagProp) end
+    TriggerServerEvent('qbx_outfitbag:server:removeItem')
+    
+    DeleteBagProp()
     
     local ped = cache.ped
     local coords = GetEntityCoords(ped)
@@ -150,11 +237,16 @@ SpawnBagProp = function()
             description = Lang:t('error.prop_load_failed'),
             type = 'error'
         })
+        TriggerServerEvent('qbx_outfitbag:server:addItem')
+        return
+    end
+    
+    if not PlayAnimation('PLACE') then
+        TriggerServerEvent('qbx_outfitbag:server:addItem')
         return
     end
     
     state.bagCoords = coords + (forward * FORWARD_OFFSET) + PROP_COORDS_OFFSET
-    
     state.bagProp = CreateObject(BAG_PROP_HASH, state.bagCoords.x, state.bagCoords.y, state.bagCoords.z, true, true, true)
     state.lastInteraction = GetGameTimer()
     
@@ -164,46 +256,17 @@ SpawnBagProp = function()
             description = Lang:t('error.prop_spawn_failed'),
             type = 'error'
         })
+        TriggerServerEvent('qbx_outfitbag:server:addItem')
         return
     end
+    
+    state.ownedBags[state.bagProp] = true
+    local netId = NetworkGetNetworkIdFromEntity(state.bagProp)
+    TriggerServerEvent('qbx_outfitbag:server:syncBagOwnership', netId)
     
     PlaceObjectOnGroundProperly(state.bagProp)
     SetEntityCollision(state.bagProp, Config.Prop.Placement.Collision, Config.Prop.Placement.Collision)
     FreezeEntityPosition(state.bagProp, Config.Prop.Placement.Frozen)
-    
-    exports.ox_target:addLocalEntity(state.bagProp, {
-        {
-            name = 'outfit_bag_menu',
-            icon = Config.Menu.Icons.Access,
-            label = Lang:t('menu.access'),
-            distance = Config.Prop.Interaction.AccessDistance,
-            onSelect = function()
-                state.lastInteraction = GetGameTimer()
-                if state.isMenuOpen then
-                    lib.hideContext(false)
-                    state.isMenuOpen = false
-                    Wait(100)
-                end
-                OpenOutfitBagMenu()
-            end,
-            canInteract = function()
-                return not lib.progressActive()
-            end
-        },
-        {
-            name = 'outfit_bag_pickup',
-            icon = Config.Menu.Icons.Pickup,
-            label = Lang:t('menu.pickup'),
-            distance = Config.Prop.Interaction.PickupDistance,
-            onSelect = function()
-                state.lastInteraction = GetGameTimer()
-                PlayPickupAnimation()
-            end,
-            canInteract = function()
-                return not lib.progressActive()
-            end
-        }
-    })
 end
 
 -- Menu Functions
@@ -331,6 +394,43 @@ function OpenOutfitBagMenu()
                                     end
                                 },
                                 {
+                                    title = Lang:t('menu.share'),
+                                    description = Lang:t('menu.share_description'),
+                                    icon = Config.Menu.Icons.Share,
+                                    iconColor = Config.Menu.Colors.Share,
+                                    onSelect = function()
+                                        local nearbyPlayers = GetNearbyPlayers()
+                                        if not nearbyPlayers then
+                                            lib.notify({
+                                                title = Lang:t('menu.outfit_bag'),
+                                                description = Lang:t('error.no_players_nearby'),
+                                                type = 'error'
+                                            })
+                                            return
+                                        end
+
+                                        local playerList = {}
+                                        for _, player in ipairs(nearbyPlayers) do
+                                            playerList[#playerList + 1] = {
+                                                title = Lang:t('menu.player_id', { playerId = player.id }),
+                                                description = Lang:t('menu.player_distance', { distance = player.distance }),
+                                                onSelect = function()
+                                                    TriggerServerEvent('qbx_outfitbag:server:shareOutfit', outfit.id, player.id)
+                                                end
+                                            }
+                                        end
+
+                                        lib.registerContext({
+                                            id = 'share_outfit_menu',
+                                            title = Lang:t('menu.share_with'),
+                                            menu = 'outfit_actions_menu',
+                                            options = playerList
+                                        })
+
+                                        lib.showContext('share_outfit_menu')
+                                    end
+                                },
+                                {
                                     title = Lang:t('menu.delete'),
                                     description = Lang:t('menu.delete_description'),
                                     icon = Config.Menu.Icons.Delete,
@@ -369,15 +469,15 @@ function OpenOutfitBagMenu()
     end)
 end
 
-exports('useOutfitBag', function(data, slot)
+exports('useOutfitBag', function()
     CreateThread(function()
-        PlaceBagOnGround()
+        SpawnBagProp()
     end)
 end)
 
 RegisterNetEvent('qbx_outfitbag:client:useOutfitBag', function()
     CreateThread(function()
-        PlaceBagOnGround()
+        SpawnBagProp()
     end)
 end)
 
@@ -422,10 +522,10 @@ RegisterNetEvent('qbx_outfitbag:client:loadOutfit', function(outfitData)
 
     if GetEntityModel(cache.ped) ~= tonumber(outfitData.model) then
         exports['illenium-appearance']:setPlayerModel(outfitData.model)
-        Wait(500) -- Wait for the model to load
+        Wait(500)
     end
     
-    PlayChangeAnimation()
+    PlayAnimation('CHANGE')
     Wait(800)
     
     exports['illenium-appearance']:setPedAppearance(cache.ped, outfitData.appearance)
@@ -441,20 +541,51 @@ RegisterNetEvent('qbx_outfitbag:client:loadOutfit', function(outfitData)
     end
 end)
 
--- Resource cleanup
-AddEventHandler('onResourceStop', function(resourceName)
-    if GetCurrentResourceName() ~= resourceName then return end
-    if state.bagProp then
-        DeleteBagProp()
+HandleBagPickup = function(entityHit)
+    if not entityHit or not DoesEntityExist(entityHit) then return end
+    
+    if not state.ownedBags[entityHit] then
+        lib.notify({
+            title = Lang:t('menu.outfit_bag'),
+            description = Lang:t('error.not_your_bag'),
+            type = 'error'
+        })
+        return
+    end
+    
+    if PlayAnimation('PICKUP') then
+        local netId = NetworkGetNetworkIdFromEntity(entityHit)
+        TriggerServerEvent('qbx_outfitbag:server:removeBagOwnership', netId)
+        
+        DeleteObject(entityHit)
+        state.ownedBags[entityHit] = nil
+        
+        TriggerServerEvent('qbx_outfitbag:server:addItem')
+        
+        if state.bagProp == entityHit then
+            state.bagProp = nil
+            state.bagCoords = nil
+        end
+    end
+end
+
+RegisterNetEvent('qbx_outfitbag:client:syncBagOwnership', function(netId, ownerServerId)
+    local entity = NetworkGetEntityFromNetworkId(netId)
+    if entity and DoesEntityExist(entity) then
+        if ownerServerId == cache.serverId then
+            state.ownedBags[entity] = true
+        end
     end
 end)
 
--- Prop cleanup timer
-CreateThread(function()
-    while true do
-        Wait(Config.Performance.PropCleanupInterval)
-        if state.bagProp and (GetGameTimer() - state.lastInteraction) > Config.Performance.PropCleanupInterval then
-            DeleteBagProp()
-        end
+RegisterNetEvent('qbx_outfitbag:client:removeBagOwnership', function(netId)
+    local entity = NetworkGetEntityFromNetworkId(netId)
+    if entity and DoesEntityExist(entity) then
+        state.ownedBags[entity] = nil
     end
+end)
+
+AddEventHandler('onResourceStop', function(resourceName)
+    if GetCurrentResourceName() ~= resourceName then return end
+    DeleteBagProp()
 end) 

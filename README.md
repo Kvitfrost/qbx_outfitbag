@@ -2,11 +2,12 @@
 
 <div align="center">
 
-![Stars](https://img.shields.io/github/stars/pvnqu/qbx_outfitbag?style=for-the-badge&color=blue)
+![License](https://img.shields.io/github/license/Qbox-project/qbx_outfitbag?style=for-the-badge&color=blue)
+![Stars](https://img.shields.io/github/stars/Qbox-project/qbx_outfitbag?style=for-the-badge&color=blue)
 
 </div>
 
-A feature-rich outfit management system for QBX Framework that adds a portable outfit bag, allowing players to store and change outfits on the go. Perfect for roleplay scenarios and general gameplay enhancement.
+A feature-rich outfit management system for QBX Framework that adds a portable outfit bag, allowing players to store, change, and share outfits on the go. Perfect for roleplay scenarios and general gameplay enhancement.
 
 ## 🌟 Features
 
@@ -15,17 +16,22 @@ A feature-rich outfit management system for QBX Framework that adds a portable o
 - ✏️ Edit names and descriptions of saved outfits
 - 👔 Quick outfit changes anywhere in the game world
 - 🗑️ Easy outfit management with delete functionality
+- 🤝 Share outfits with nearby players
 - 🎭 Smooth animations when using the bag
 - 🎨 Modern UI powered by ox_lib
 - 🔄 Seamless integration with illenium-appearance
 - 💼 Physical bag prop placement in-game
-- 🌐 Multi-language support through locale files
+- 🌐 Comprehensive multi-language support
+- 🔒 Secure ownership system
+- ⚡ Optimized performance
+- 🛡️ Anti-exploit measures
 
 ## 📋 Dependencies
 
 - [QBX Core](https://github.com/Qbox-project/qbx_core)
 - [ox_lib](https://github.com/overextended/ox_lib)
 - [ox_target](https://github.com/overextended/ox_target)
+- [ox_inventory](https://github.com/overextended/ox_inventory)
 - [oxmysql](https://github.com/overextended/oxmysql)
 - [illenium-appearance](https://github.com/iLLeniumStudios/illenium-appearance)
 
@@ -37,22 +43,32 @@ A feature-rich outfit management system for QBX Framework that adds a portable o
    ```cfg
    ensure qbx_outfitbag
    ```
-4. Add the following item to your `items.lua` in qbx-core:
+4. Add the following item to your `ox_inventory/data/items.lua`:
    ```lua
     ['outfit_bag'] = {
         label = 'Outfit Bag',
         weight = 100,
         stack = false,
         close = true,
-        description = 'A bag to store and change your outfits on the go',
-        client = {
-            anim = { dict = 'clothingshirt', clip = 'try_shirt_positive_d' },
-            usetime = 2000,
-            export = 'qbx_outfitbag.useOutfitBag'
-        }
+        description = 'A bag to store and change your outfits on the go'
     },
    ```
 5. The SQL table will be auto-created on first resource start
+
+## 🌍 Supported Languages
+
+The resource includes full translations for:
+- 🇺🇸 English (en)
+- 🇩🇪 German (de)
+- 🇪🇸 Spanish (es)
+- 🇫🇷 French (fr)
+- 🇮🇹 Italian (it)
+- 🇳🇱 Dutch (nl)
+- 🇵🇱 Polish (pl)
+- 🇵🇹 Portuguese (pt)
+- 🇷🇺 Russian (ru)
+- 🇹🇷 Turkish (tr)
+- 🇨🇳 Chinese (zh)
 
 ## 🎮 Usage Guide
 
@@ -65,25 +81,95 @@ A feature-rich outfit management system for QBX Framework that adds a portable o
    - View saved outfits
    - Change into saved outfits
    - Edit outfit names and descriptions
+   - Share outfits with nearby players
    - Delete unwanted outfits
 
 ### Controls & Commands
 - Use the item from inventory to place/pickup the bag
 - Target the bag with your crosshair to access its menu
 - ESC to close menus
+- Only the owner can pick up their bag
+- Bags are persistent across server restarts
+- Share outfits with players within the configured distance
 
 ## ⚙️ Configuration
 
 ### config.lua Options
 ```lua
 Config = {
-    MaxOutfits = 5,              -- Maximum outfits per bag
+    DefaultLanguage = 'en',      -- Default language for the script
+    MaxOutfits = 10,            -- Maximum outfits per bag
     OutfitBagItem = 'outfit_bag', -- Item name for the outfit bag
-    Animation = {
-        dict = 'anim@heists@ornate_bank@grab_cash',
-        anim = 'intro',
-        flags = 51,
-        duration = 1600
+
+    Menu = {
+        Colors = {              -- Menu color scheme
+            Save = 'success',
+            Load = 'primary',
+            Edit = 'warning',
+            Delete = 'danger',
+            Info = 'primary',
+            Disabled = 'dark',
+            Share = 'info'
+        }
+    },
+
+    Animations = {
+        Change = {             -- Outfit change animation
+            dict = 'clothingshirt',
+            anim = 'try_shirt_positive_d',
+            flags = 16,
+            duration = 3500,
+            progressDuration = 3500
+        },
+        Place = {             -- Bag placement animation
+            dict = 'anim@mp_snowball',
+            anim = 'pickup_snowball',
+            flags = 16,
+            duration = 2000,
+            progressDuration = 2000
+        },
+        Pickup = {           -- Bag pickup animation
+            dict = 'anim@mp_snowball',
+            anim = 'pickup_snowball',
+            duration = 2000,
+            progressDuration = 2000,
+            flags = 16
+        }
+    },
+
+    Prop = {
+        Model = 'prop_cs_heist_bag_02',  -- Bag prop model
+        Placement = {
+            ForwardOffset = 0.5,         -- Distance in front of player
+            ZOffset = -0.2,              -- Height offset
+            Collision = true,            -- Enable collision
+            Frozen = true               -- Freeze prop position
+        },
+        Interaction = {
+            AccessDistance = 2.0,        -- Distance to access menu
+            PickupDistance = 2.0,        -- Distance to pickup bag
+            ShareDistance = 3.0         -- Distance to share outfits
+        }
+    },
+
+    Notifications = {
+        Position = 'center-right',      -- Notification position
+        Duration = {
+            Success = 3000,             -- Success notification duration
+            Error = 5000,               -- Error notification duration
+            Info = 2000                 -- Info notification duration
+        }
+    },
+
+    Performance = {
+        PropCleanupInterval = 300000,   -- Cleanup check interval (5 mins)
+        PropIdleTimeout = 600000,       -- Prop removal timeout (10 mins)
+        CacheOutfits = true,           -- Enable outfit caching
+        CacheTimeout = 600000,         -- Cache timeout (10 mins)
+        MaxConcurrentBags = 1,         -- Max bags per player
+        AnimLoadTimeout = 1000,        -- Animation load timeout
+        ModelLoadTimeout = 1000,       -- Model load timeout
+        RenderDistance = 50.0          -- Prop render distance
     }
 }
 ```
@@ -98,7 +184,17 @@ qbx_outfitbag/
 ├── server/
 │   └── main.lua
 ├── locales/
-│   └── en.lua
+│   ├── de.lua
+│   ├── en.lua
+│   ├── es.lua
+│   ├── fr.lua
+│   ├── it.lua
+│   ├── nl.lua
+│   ├── pl.lua
+│   ├── pt.lua
+│   ├── ru.lua
+│   ├── tr.lua
+│   └── zh.lua
 ├── config.lua
 └── fxmanifest.lua
 ```
@@ -133,11 +229,18 @@ If you find this resource helpful, please consider:
 
 ## 🔄 Changelog
 
-### Latest Version
-- Fixed UI display to show correct maximum outfits from config
-- Added multi-language support
-- Improved error handling
-- Enhanced animation smoothness
+### Latest Version (1.0.0)
+- Added outfit sharing functionality with nearby players
+- Added comprehensive language support for 11 languages
+- Improved bag ownership system with better security
+- Enhanced animation system with better error handling
+- Added detailed configuration options
+- Added anti-exploit measures
+- Added persistent bag placement
+- Added outfit description support
+- Added edit functionality for saved outfits
+- Optimized performance and reduced resource usage
+- Fixed various bugs and improved stability
 
 [View full changelog](CHANGELOG.md)
 
